@@ -122,5 +122,5 @@ function loop(){
       break;
   }
   frame++;
-  requestAnimationFrame(loop); // 1/60病後にもう一度呼び出す
+  requestAnimationFrame(loop); // 1/60秒後にもう一度呼び出す
 }
