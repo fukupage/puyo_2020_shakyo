@@ -27,7 +27,7 @@ class Stage {
     scoreElement.style.backgroundColor = Config.scoreBackgroundColor;
     scoreElement.style.top = Config.puyoImgHeight * Config.stageRows + 'px';
     scoreElement.style.width = Config.puyoImgWidth * Config.stageCols + 'px';
-    scoreElement.style.height = Config, fontHeight + "px";
+    scoreElement.style.height = Config.fontHeight + "px";
     this.scoreElement = scoreElement;
 
     //メモリを準備する
@@ -67,7 +67,7 @@ class Stage {
     puyoImage.style.left = x * Config.puyoImgWidth + "px";
     puyoImage.style.top = x * Config.puyoImgHeihht + "px";
     this.stageElement.appendChild(puyoImage);
-    //メモリにせっとする
+    //メモリにセットする
     this.board[y][x] = {
       puyo: puyo,
       element: puyoImage
@@ -81,8 +81,8 @@ class Stage {
     //下の行から上の行を見ていく
     for (let y = Config.stageRows - 2; y >= 0; y--) {
       const line = this.board[y];
-      if (this.board[y][x]) {
-        for (let x = 0; x < line.length; x++) {
+      for (let x = 0; x < line.length; x++) {
+        if (this.board[y][x]) {
           //このマスにぷよがなければ次
           continue;
         }
@@ -163,54 +163,115 @@ class Stage {
       this.board[y][x] = null;
 
       //4方向の周囲ぷよを確認する
-    const direction = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-    for (let i = 0; i < direction.length; i++) {
-      const dx = x + direction[i][0];
-      const dy = y + direction[i][1];
-      if (dx < 0 || dy < 0 || dx >= Config.stageCols || dy >= Config.stageRows) {
-        //ステージの外にはみ出た
-        continue;
-      }
-      const cell = this.board[dy][dx];
-      if (!cell || cell.puyo !== puyo) {
-        //ぷよの色が違う
-        continue;
-      }
-      //そのぷよのまわりのぷよも消せるか確認する
-      checkSequentinalPuyo(dx, dy);
+      const direction = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+      for (let i = 0; i < direction.length; i++) {
+        const dx = x + direction[i][0];
+        const dy = y + direction[i][1];
+        if (dx < 0 || dy < 0 || dx >= Config.stageCols || dy >= Config.stageRows) {
+          //ステージの外にはみ出た
+          continue;
+        }
+        const cell = this.board[dy][dx];
+        if (!cell || cell.puyo !== puyo) {
+          //ぷよの色が違う
+          continue;
+        }
+        //そのぷよのまわりのぷよも消せるか確認する
+        checkSequentinalPuyo(dx, dy);
+      };
     };
-  };
 
-  //実際に削除できるかの確認を行う
-  for(let y = 0; y <Config.stageRows; y++) {
-  for (let x = 0; x < Config.stageCols; x++) {
-    sequencePuyoInfoList.length = 0;
-    const puyoColor = this.board[y][x] && this.board[y][x].puyo;
-    checkSequentinalPuyo(x, y);
-    if (sequencePuyoInfoList.length === 0 || sequencePuyoInfoList.length < Config.erasePuyoCount) {
-      if (sequencePuyoInfoList.length) {
-        //対比していたぷよを消さないリストに追加する
-        existingPuyoInfoList.push(...sequencePuyoInfoList);
+    //実際に削除できるかの確認を行う
+    for (let y = 0; y < Config.stageRows; y++) {
+      for (let x = 0; x < Config.stageCols; x++) {
+        sequencePuyoInfoList.length = 0;
+        const puyoColor = this.board[y][x] && this.board[y][x].puyo;
+        checkSequentinalPuyo(x, y);
+        if (sequencePuyoInfoList.length === 0 || sequencePuyoInfoList.length < Config.erasePuyoCount) {
+          if (sequencePuyoInfoList.length) {
+            //対比していたぷよを消さないリストに追加する
+            existingPuyoInfoList.push(...sequencePuyoInfoList);
+          }
+        } else {
+          //これらは消していいもので消すリストに追加する
+          this.erasingPuyoInfoList.push(...sequencePuyoInfoList);
+          erasedPuyoColor[puyoColor] = true;
+        }
       }
-    } else {
-      //これらは消していいもので消すリストに追加する
-      this.erasingPuyoInfoList.push(...sequencePuyoInfoList);
-      erasedPuyoColor[puyoColor] = true;
+    }
+    this.puyoCount -= this.erasingPuyoInfoList.length;
+
+    //消さないリストに入っていたぷよをメモリに復帰させる
+    for (const info of existingPuyoInfoList) {
+      this.board[info.y][info.x] = info.cell;
+    }
+
+    if (this.erasingPuyoInfoList.length) {
+      //もし消せるならば消えるぷよの個数と個数の色の情報をまとめて返す
+      return {
+        piece: this.erasingPuyoInfoList.length,
+        color: Pbject.keys(erasedPuyoColor).length
+      };
+    }
+    return null;
+  }
+
+  //消すアニメーションをする
+  static erasing(frame) {
+    const elapsedFrame = frame - this.eraseStartFrame;
+    const ratio = elapsedFrame / Config.eraseAnimatonDuration;
+    if (ratio > 1) {
+      //アニメーションを終了する
+      for (const info of this.erasingPuyoInfoList) {
+        var element = info.cell.element;
+        this.stageElement.removeChild(element);
+      }
+      return false;
+    } else if (ratio > 0.75) {
+      for (const info of this.erasingPuyoInfoList) {
+        var element = info.cell.element;
+        element.style.didplay = 'block';
+      }
+      return true;
+    } else if (ratio > 0.50) {
+      for (const info of this.erasingPuyoInfoList) {
+        var element = info.cell.element;
+        element.style.display = 'block';
+      }
+      return true;
     }
   }
-}
-this.puyoCount -= this.erasingPuyoInfoList.length;
+  static showZenkeshi() {
+    //全消しを表示する
+    this.zenkeshiImage.style.display = 'block';
+    this.zenkeshiImage.style.opacity = '1';
+    const startTime = Date.now();
+    const startTop = Config.puyoImgHeight * Config.stageRows;
+    const endTop = Config.puyoImgHeight * Config.stageRows * 3;
+    const animation = () => {
 
-//消さないリストに入っていたぷよをメモリに復帰させる
-for (const info of existingPuyoInfoList) {
-  this.board[info.y][info.x] = info.cell;
+      const ratio = Math.min((Date.now() - startTime) / Config.zenkeshiDuration, 1);
+      this.zenkeshiImage.style.top = (endTop - StartTop) * ratio + startTop + 'px';
+      if (ratio !== 1) {
+        requestAnimationFrame(animation);
+      }
+    };
+    animation();
+  }
+  static hideZenkeshi() {
+    //全消しを消去する
+    const startTime = Date.now();
+    const animation = () => {
+      const ratio = Math.min((Date.now() - startTime) / Config.zenkeshiDuration, 1);
+      this.zenkeshiImage.opacity = String(1 - ratio);
+      if (ratio !== 1) {
+        requestAnimationFrame(animation);
+      } else {
+        this.zenkeshiImage.style.disokay = 'none';
+      }
+    };
+    animation();
+  }
 }
-
-if (this.erasingPuyoInfoList.length) {
-  //もし消せるならば消えるぷよの個数と個数の色の情報をまとめて返す
-  return {
-    piece: this.erasingPuyoInfoList.length;
-    color: Pbject.keys(erasedPuyoColor).length
-  };
-}
-
+Stage.fallingPuyoList = [];
+Stage.erasingPuyoInfoList = [];
